@@ -1,5 +1,5 @@
 pub struct EventBuilder {
-    pending_event: EventBuilderState
+    pending_event: EventBuilderState,
 }
 
 /// Event data sent by server
@@ -10,25 +10,31 @@ pub struct Event {
     /// Represents message `event` field. Default "message".
     pub type_: String,
     /// Represents message `data` field. Default "".
-    pub data: String
+    pub data: String,
 }
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum EventBuilderState {
     Empty,
     Pending(Event),
-    Complete(Event)
+    Complete(Event),
 }
 
 impl Event {
     pub fn new(type_: &str, data: &str) -> Event {
-        Event { id: String::from(""), type_: String::from(type_), data: String::from(data) }
+        Event {
+            id: String::from(""),
+            type_: String::from(type_),
+            data: String::from(data),
+        }
     }
 }
 
 impl EventBuilder {
     pub fn new() -> EventBuilder {
-        EventBuilder { pending_event: EventBuilderState::Empty }
+        EventBuilder {
+            pending_event: EventBuilderState::Empty,
+        }
     }
 
     pub fn update(&mut self, message: &str) -> EventBuilderState {
@@ -45,14 +51,14 @@ impl EventBuilder {
         self.pending_event = match self.pending_event {
             EventBuilderState::Complete(_) => EventBuilderState::Empty,
             EventBuilderState::Pending(ref event) => EventBuilderState::Complete(event.clone()),
-            ref e => e.clone()
+            ref e => e.clone(),
         };
     }
 
     fn update_event(&mut self, message: &str) -> EventBuilderState {
         let mut pending_event = match &self.pending_event {
             EventBuilderState::Pending(ref e) => e.clone(),
-            _ => Event::new("message", "")
+            _ => Event::new("message", ""),
         };
 
         match parse_field(message) {
@@ -66,16 +72,16 @@ impl EventBuilder {
     }
 
     pub fn clear(&mut self) {
-        self.pending_event =  EventBuilderState::Empty;
+        self.pending_event = EventBuilderState::Empty;
     }
 
     pub fn get_event(&self) -> EventBuilderState {
-       self.pending_event.clone()
+        self.pending_event.clone()
     }
 }
 
 fn parse_field<'a>(message: &'a str) -> (&'a str, &'a str) {
-    let parts: Vec<&str> = message.splitn(2, ":").collect();
+    let parts: Vec<&str> = message.splitn(2, |c| c == ':').collect();
     (parts[0], parts[1].trim())
 }
 
@@ -88,6 +94,25 @@ mod tests {
         let e = EventBuilder::new();
 
         assert_eq!(e.get_event(), EventBuilderState::Empty);
+    }
+
+    #[test]
+    fn should_start_with_config() {
+        let data = r#"data:{"op":"run","ns":"kube-system","output":"kafka:kube-ovn-pinger@10.200.100.200:9092","service_name":"kube-ovn-pinger","pod_name":"kube-ovn-pinger-5t54w","node_name":"node1","ips":["10.16.0.20"],"offset":0,"filter":{"expr":"*","max_length":1000000000}}"#;
+        let mut e = EventBuilder::new();
+        e.update(data);
+        e.update("");
+
+        if let EventBuilderState::Complete(event) = e.get_event() {
+            assert_eq!(
+                event.data,
+                String::from(
+                    r#"{"op":"run","ns":"kube-system","output":"kafka:kube-ovn-pinger@10.200.100.200:9092","service_name":"kube-ovn-pinger","pod_name":"kube-ovn-pinger-5t54w","node_name":"node1","ips":["10.16.0.20"],"offset":0,"filter":{"expr":"*","max_length":1000000000}}"#
+                )
+            );
+        } else {
+            panic!("event should be complete");
+        }
     }
 
     #[test]
@@ -237,7 +262,6 @@ mod tests {
         } else {
             panic!("event should be pending");
         }
-
     }
 
     #[test]
